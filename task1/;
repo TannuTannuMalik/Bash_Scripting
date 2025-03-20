@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Log file
+LOG_FILE="/var/log/user_script.log"
+
+# Function to log messages
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Check input arguments
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <CSV file or URL>"
+    exit 1
+fi
+
+INPUT="$1"
+
+# Download if remote file
+if [[ "$INPUT" =~ ^https?:// ]]; then
+    log_message "Downloading file from $INPUT"
+    wget -O /tmp/users.csv "$INPUT"
+    INPUT="/tmp/users.csv"
+fi
+
+# Verify file exists
+if [ ! -f "$INPUT" ]; then
+    log_message "Error: File not found!"
+    exit 1
+fi
+
+# Process CSV file
+while IFS=',' read -r email birthdate groups sharedFolder; do
+    username="${email%%@*}"
+    password="$(date -d "$birthdate" '+%m%Y')"
+
+    # Create user if not exists
+    if ! id "$username" &>/dev/null; then
+        useradd -m "$username"
+        echo "$username:$password" | chpasswd
+        log_message "Created user: $username with password: $password"
+    else
+        log_message "User $username already exists"
+    fi
+
+    # Handle groups
+    IFS=';' read -ra group_array <<< "$groups"
+    for group in "${group_array[@]}"; do
+        if ! getent group "$group" > /dev/null; then
+            groupadd "$group"
+            log_message "Created group: $group"
+        fi
+        usermod -aG "$group" "$username"
+        log_message "Added $username to group: $group"
+    done
+
+    # Shared folder setup
+    if [ ! -d "$sharedFolder" ]; then
+        mkdir -p "$sharedFolder"
+        chown :"$group" "$sharedFolder"
+        chmod 770 "$sharedFolder"
+        log_message "Created shared folder: $sharedFolder"
+    fi
+
+    # Create symbolic link
+    ln -s "$sharedFolder" "/home/$username/sharedFolder"
+    log_message "Created symlink for $username to $sharedFolder"
+
+done < <(tail -n +2 "$INPUT")
+
+log_message "User management completed!"
+

@@ -1,0 +1,6 @@
+email,birthdate,groups,sharedFolder
+edsger.dijkstra@tue.nl,1930-05-11,"sudo,staff",/staffData
+linus.torvalds@linux.org,1969-12-28,"developers",/devData
+tanu.malik@example.com,1995-06-15,"sudo,staff",/staffData
+vivek.talpada@example.com,1998-08-20,"developers",/devData
+
